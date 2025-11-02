@@ -41,10 +41,3 @@ A web-based platform connecting clients with developers through coding projects 
    ```bash
    git clone https://github.com/MahammedTaha/CodeArena.git
    cd CodeArena
-
-
-### Database Setup
-
-1. **Create MySQL Database**
-   ```sql
-   CREATE DATABASE codearena;
