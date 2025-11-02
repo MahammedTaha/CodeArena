@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Dashboard - CodeArena</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="header">
+    <div class="container">
+        <div class="logo">
+            <a href="/" style="text-decoration: none;">
+                <strong style="color:#00e6c3">CodeArena</strong>
+            </a>
+        </div>
+        <nav class="nav">
+            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/marketplace">Marketplace</a>
+            <a href="/quests">Quests</a>
+            <a href="#" onclick="logout()" class="btn-outline">Logout</a>
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+    <div class="dashboard-header">
+        <h1>👔 Client Dashboard</h1>
+        <p>Welcome back, <span id="username"></span>! Create coding challenges for developers.</p>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <h3>📋 Total Quests</h3>
+            <p id="totalQuests">0</p>
+        </div>
+        <div class="stat-card">
+            <h3>🟢 Active Quests</h3>
+            <p id="activeQuests">0</p>
+        </div>
+        <div class="stat-card">
+            <h3>👥 Participants</h3>
+            <p id="totalParticipants">0</p>
+        </div>
+        <div class="stat-card">
+            <h3>⭐ Avg. Rating</h3>
+            <p id="averageRating">-</p>
+        </div>
+    </div>
+
+    <div class="dashboard-actions">
+        <button class="btn btn-large" onclick="showCreateQuestForm()">➕ Create New Quest</button>
+        <a href="/quests" class="btn-outline btn-large">📋 View All Quests</a>
+        <a href="/marketplace" class="btn-outline btn-large">💼 Browse Projects</a>
+    </div>
+
+    <div class="my-quests">
+        <div class="section-header">
+            <h2>My Quests</h2>
+            <button class="btn btn-small" onclick="showCreateQuestForm()">+ New Quest</button>
+        </div>
+        <div id="myQuestsList" class="quests-grid">
+            <!-- Client's quests will be loaded here -->
+        </div>
+    </div>
+</main>
+
+<!-- Create Quest Modal -->
+<div id="createQuestModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeCreateQuestForm()">&times;</span>
+        <h2>Create New Quest</h2>
+        <form id="createQuestForm">
+            <div class="form-group">
+                <label for="questTitle">Quest Title</label>
+                <input type="text" id="questTitle" name="title" placeholder="Enter quest title" required>
+            </div>
+
+            <div class="form-group">
+                <label for="questDescription">Description</label>
+                <textarea id="questDescription" name="description" placeholder="Describe the coding challenge..." rows="4" required></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="questDifficulty">Difficulty</label>
+                    <select id="questDifficulty" name="difficulty" required>
+                        <option value="">Select Difficulty</option>
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="questPoints">Points Reward</label>
+                    <input type="number" id="questPoints" name="points_reward" placeholder="Points" min="1" max="1000" required>
+                </div>
+            </div>
+
+
+            <button type="submit" class="btn btn-large" style="width: 100%;">Create Quest</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentUser = null;
+
+    async function loadDashboard() {
+        try {
+            const response = await fetch('/api/auth/current-user', {
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                currentUser = await response.json();
+                displayDashboard(currentUser);
+                loadMyQuests(currentUser.username);
+            } else {
+                window.location.href = '/login';
+            }
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+        }
+    }
+
+    function displayDashboard(user) {
+        document.getElementById('username').textContent = user.username;
+    }
+
+    async function loadMyQuests(username) {
+        try {
+            const response = await fetch(`/api/quests/my-quests?username=${username}`);
+            if (response.ok) {
+                const quests = await response.json();
+                displayMyQuests(quests);
+                updateQuestStats(quests);
+            }
+        } catch (error) {
+            console.error('Error loading my quests:', error);
+        }
+    }
+
+    function displayMyQuests(quests) {
+        const container = document.getElementById('myQuestsList');
+
+        if (quests.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>No Quests Yet</h3>
+                    <p>Create your first coding challenge to get started!</p>
+                    <button class="btn" onclick="showCreateQuestForm()">Create Your First Quest</button>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        quests.slice(0, 6).forEach(quest => { // Show latest 6 quests
+            html += `
+                <div class="quest-card">
+                    <div class="quest-header">
+                        <h3>${quest.title}</h3>
+                        <span class="difficulty ${quest.difficulty.toLowerCase()}">${quest.difficulty}</span>
+                    </div>
+                    <p>${quest.description}</p>
+
+                    <div class="quest-footer">
+                        <span class="points">${quest.points_reward} pts</span>
+                        <div class="quest-actions">
+                            <button class="btn btn-small" onclick="viewQuestDetails(${quest.Q_id})">View</button>
+                            <button class="btn-outline btn-small" onclick="editQuest(${quest.Q_id})">Edit</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function updateQuestStats(quests) {
+        const totalQuests = quests.length;
+        const activeQuests = quests.length; // All quests are considered active for now
+        const totalParticipants = totalQuests * 25; // Mock data
+        const averageRating = totalQuests > 0 ? '4.2★' : '-';
+
+        document.getElementById('totalQuests').textContent = totalQuests;
+        document.getElementById('activeQuests').textContent = activeQuests;
+        document.getElementById('totalParticipants').textContent = totalParticipants;
+        document.getElementById('averageRating').textContent = averageRating;
+    }
+
+    function showCreateQuestForm() {
+        document.getElementById('createQuestModal').style.display = 'block';
+    }
+
+    function closeCreateQuestForm() {
+        document.getElementById('createQuestModal').style.display = 'none';
+        document.getElementById('createQuestForm').reset();
+    }
+
+    document.getElementById('createQuestForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        const quest = {
+            title: formData.get('title'),
+            description: formData.get('description'),
+            difficulty: formData.get('difficulty'),
+            points_reward: parseInt(formData.get('points_reward')),
+            posted_by: currentUser.username
+        };
+
+        // Auto-set points based on difficulty if not specified
+        if (!quest.points_reward) {
+            switch(quest.difficulty) {
+                case 'Easy': quest.points_reward = 25; break;
+                case 'Medium': quest.points_reward = 75; break;
+                case 'Hard': quest.points_reward = 200; break;
+                default: quest.points_reward = 50;
+            }
+        }
+
+        try {
+            const res = await fetch('/api/quests', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(quest)
+            });
+
+            if (res.ok) {
+                alert('🎉 Quest created successfully!');
+                closeCreateQuestForm();
+                loadMyQuests(currentUser.username);
+            } else {
+                const error = await res.text();
+                alert('❌ Failed to create quest: ' + error);
+            }
+        } catch (err) {
+            console.error('Error creating quest:', err);
+            alert('❌ Error creating quest. Please try again.');
+        }
+    });
+
+    function viewQuestDetails(questId) {
+        window.location.href = `/quests#quest-${questId}`;
+    }
+
+    async function logout() {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/';
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('createQuestModal');
+        if (event.target === modal) {
+            closeCreateQuestForm();
+        }
+    }
+
+    // Load dashboard when page loads
+    loadDashboard();
+</script>
+
+<style>
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-header h2 {
+        color: #00e6c3;
+        margin: 0;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        background: #1a1a1a;
+        border-radius: 10px;
+        border: 2px dashed #333;
+    }
+
+    .empty-state h3 {
+        color: #00e6c3;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state p {
+        color: #888;
+        margin-bottom: 2rem;
+    }
+
+    .quest-stats {
+        display: flex;
+        justify-content: space-around;
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background: #2a2a2a;
+        border-radius: 8px;
+    }
+
+    .stat {
+        text-align: center;
+    }
+
+    .stat-value {
+        display: block;
+        font-weight: bold;
+        color: #00e6c3;
+        font-size: 1.1rem;
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: #888;
+    }
+
+    .quest-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #00e6c3;
+        font-weight: bold;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #333;
+        border-radius: 5px;
+        background: #2a2a2a;
+        color: #fff;
+        font-size: 1rem;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #00e6c3;
+    }
+</style>
+</body>
+</html>

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quests - CodeArena</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="header">
+    <div class="container">
+        <div class="logo">
+            <a href="/" style="text-decoration: none;">
+                <strong style="color:#00e6c3">CodeArena</strong>
+            </a>
+        </div>
+        <nav class="nav">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/marketplace">Marketplace</a>
+            <a href="/quests" class="active">Quests</a>
+            <a href="/leaderboard">Leaderboard</a>
+            <a href="#" onclick="logout()" class="btn-outline">Logout</a>
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+    <div class="page-header">
+        <h1>Coding Quests</h1>
+        <p>Complete challenges and earn points</p>
+    </div>
+
+    <!-- Post Quest Button (Visible to Clients) -->
+    <div id="clientSection" style="display: none;">
+        <div class="create-quest-section" style="text-align: center; margin: 2rem 0;">
+            <button class="btn btn-large" onclick="showCreateQuestForm()">➕ Post New Quest</button>
+        </div>
+
+        <div class="my-quests-section" style="margin: 2rem 0;">
+            <h2>My Posted Quests</h2>
+            <div id="myQuestsList" class="quests-grid">
+                <!-- User's quests will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="filters">
+        <button class="btn-filter active" onclick="filterQuests('all')">All Quests</button>
+        <button class="btn-filter" onclick="filterQuests('Easy')">Easy</button>
+        <button class="btn-filter" onclick="filterQuests('Medium')">Medium</button>
+        <button class="btn-filter" onclick="filterQuests('Hard')">Hard</button>
+    </div>
+
+    <div id="questsList" class="quests-grid">
+        <!-- All quests will be loaded here -->
+    </div>
+</main>
+
+<!-- Create Quest Modal -->
+<div id="createQuestModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeCreateQuestForm()">&times;</span>
+        <h2>Create New Quest</h2>
+        <form id="createQuestForm">
+            <input type="text" name="title" placeholder="Quest Title" required>
+            <textarea name="description" placeholder="Quest Description" rows="4" required></textarea>
+            <select name="difficulty" required>
+                <option value="">Select Difficulty</option>
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+            </select>
+            <input type="number" name="points_reward" placeholder="Points Reward" min="1" max="1000" required>
+            <button type="submit" class="btn">Create Quest</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentUser = null;
+    let allQuests = [];
+
+    async function loadPage() {
+        await loadCurrentUser();
+        await loadQuests();
+        if (currentUser && currentUser.role === 'ROLE_CLIENT') {
+            await loadMyQuests();
+        }
+    }
+
+    async function loadCurrentUser() {
+        try {
+            const res = await fetch('/api/auth/current-user', {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                currentUser = await res.json();
+                // Show client section if user is a client
+                if (currentUser.role === 'ROLE_CLIENT') {
+                    document.getElementById('clientSection').style.display = 'block';
+                }
+            }
+        } catch (err) {
+            console.error('Error loading current user:', err);
+        }
+    }
+
+    async function loadQuests() {
+        try {
+            const res = await fetch('/api/quests');
+            if (res.ok) {
+                allQuests = await res.json();
+                displayQuests(allQuests);
+            }
+        } catch (err) {
+            console.error('Error loading quests:', err);
+        }
+    }
+
+    async function loadMyQuests() {
+        try {
+            const res = await fetch(`/api/quests/my-quests?username=${currentUser.username}`);
+            if (res.ok) {
+                const myQuests = await res.json();
+                displayMyQuests(myQuests);
+            }
+        } catch (err) {
+            console.error('Error loading my quests:', err);
+        }
+    }
+
+    function displayQuests(quests) {
+        const container = document.getElementById('questsList');
+        container.innerHTML = '';
+
+        if (quests.length === 0) {
+            container.innerHTML = '<p>No quests available at the moment.</p>';
+            return;
+        }
+
+        quests.forEach(quest => {
+            const questCard = `
+                <div class="quest-card" data-difficulty="${quest.difficulty}">
+                    <div class="quest-header">
+                        <h3>${quest.title}</h3>
+                        <span class="difficulty ${quest.difficulty.toLowerCase()}">${quest.difficulty}</span>
+                    </div>
+                    <p>${quest.description}</p>
+                    <div class="quest-meta">
+                        <small>Posted by: ${quest.posted_by || 'System'}</small>
+                    </div>
+                    <div class="quest-footer">
+                        <span class="points">${quest.points_reward} points</span>
+                        <button class="btn btn-small" onclick="startQuest(${quest.Q_id})">Start Quest</button>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += questCard;
+        });
+    }
+
+    function displayMyQuests(quests) {
+        const container = document.getElementById('myQuestsList');
+        container.innerHTML = '';
+
+        if (quests.length === 0) {
+            container.innerHTML = '<p>You haven\'t posted any quests yet.</p>';
+            return;
+        }
+
+        quests.forEach(quest => {
+            const questCard = `
+                <div class="quest-card" data-difficulty="${quest.difficulty}">
+                    <div class="quest-header">
+                        <h3>${quest.title}</h3>
+                        <span class="difficulty ${quest.difficulty.toLowerCase()}">${quest.difficulty}</span>
+                    </div>
+                    <p>${quest.description}</p>
+                    <div class="quest-footer">
+                        <span class="points">${quest.points_reward} points</span>
+                        <span class="status">Your Quest</span>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += questCard;
+        });
+    }
+
+    function filterQuests(difficulty) {
+        const cards = document.querySelectorAll('#questsList .quest-card');
+        const buttons = document.querySelectorAll('.btn-filter');
+
+        buttons.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        cards.forEach(card => {
+            if (difficulty === 'all' || card.dataset.difficulty === difficulty) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    function showCreateQuestForm() {
+        document.getElementById('createQuestModal').style.display = 'block';
+    }
+
+    function closeCreateQuestForm() {
+        document.getElementById('createQuestModal').style.display = 'none';
+    }
+
+    document.getElementById('createQuestForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        const quest = {
+            title: formData.get('title'),
+            description: formData.get('description'),
+            difficulty: formData.get('difficulty'),
+            points_reward: parseInt(formData.get('points_reward')),
+            posted_by: currentUser.username
+        };
+
+        try {
+            const res = await fetch('/api/quests', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(quest)
+            });
+
+            if (res.ok) {
+                alert('Quest created successfully!');
+                closeCreateQuestForm();
+                loadQuests();
+                loadMyQuests();
+                e.target.reset();
+            } else {
+                const error = await res.text();
+                alert('Failed to create quest: ' + error);
+            }
+        } catch (err) {
+            console.error('Error creating quest:', err);
+            alert('Error creating quest. Please try again.');
+        }
+    });
+
+    function startQuest(questId) {
+        alert(`Starting quest ${questId}! This would open the coding environment in a real application.`);
+        // Here you would typically redirect to a coding interface
+        // window.location.href = `/code-editor?quest=${questId}`;
+    }
+
+    async function logout() {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/';
+        } catch (err) {
+            console.error('Error logging out:', err);
+        }
+    }
+
+    // Load page when ready
+    document.addEventListener('DOMContentLoaded', loadPage);
+</script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CodeArena</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="header">
+    <div class="container">
+        <div class="logo">
+            <a href="/" style="text-decoration: none;">
+                <strong style="color:#00e6c3">CodeArena</strong>
+            </a>
+        </div>
+        <nav class="nav">
+            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/marketplace">Marketplace</a>
+            <a href="/quests">Quests</a>
+            <a href="/leaderboard">Leaderboard</a>
+            <a href="#" onclick="logout()" class="btn-outline">Logout</a>
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+    <div id="dashboardContent">
+        <div class="loading-message">
+            <h2>Loading your dashboard...</h2>
+            <p id="statusMessage">Checking authentication...</p>
+        </div>
+    </div>
+</main>
+
+<script>
+    // Load dashboard data
+    async function loadDashboard() {
+        console.log('Starting dashboard load...');
+        const statusElement = document.getElementById('statusMessage');
+
+        try {
+            statusElement.textContent = 'Checking session...';
+
+            // Check session WITH credentials
+            const sessionResponse = await fetch('/api/auth/debug-session', {
+                credentials: 'include'  // ← THIS IS CRITICAL
+            });
+
+            console.log('Session response status:', sessionResponse.status);
+            console.log('Session response URL:', sessionResponse.url);
+
+            // Check if we got redirected
+            if (sessionResponse.redirected) {
+                console.log('Request was redirected to:', sessionResponse.url);
+                statusElement.textContent = 'Session expired. Redirecting to login...';
+                setTimeout(() => window.location.href = '/login', 2000);
+                return;
+            }
+
+            if (!sessionResponse.ok) {
+                throw new Error(`Session check failed: ${sessionResponse.status}`);
+            }
+
+            const sessionData = await sessionResponse.json();
+            console.log('Session data:', sessionData);
+
+            if (!sessionData.userInSession) {
+                statusElement.textContent = 'No active session. Redirecting to login...';
+                setTimeout(() => window.location.href = '/login', 2000);
+                return;
+            }
+
+            statusElement.textContent = 'Loading user data...';
+
+            // Get user data WITH credentials
+            const userResponse = await fetch('/api/auth/current-user', {
+                credentials: 'include'  // ← THIS IS CRITICAL
+            });
+
+            console.log('User response status:', userResponse.status);
+
+            if (userResponse.redirected) {
+                console.log('User request was redirected to:', userResponse.url);
+                statusElement.textContent = 'Authentication failed. Redirecting...';
+                setTimeout(() => window.location.href = '/login', 2000);
+                return;
+            }
+
+            if (!userResponse.ok) {
+                throw new Error(`User data failed: ${userResponse.status}`);
+            }
+
+            const userData = await userResponse.json();
+            console.log('User data loaded:', userData);
+
+            // Display dashboard
+            displayDashboard(userData);
+
+        } catch (error) {
+            console.error('Dashboard load error:', error);
+            statusElement.textContent = 'Error: ' + error.message;
+            statusElement.style.color = 'red';
+        }
+    }
+
+    function displayDashboard(user) {
+        const dashboardHTML = `
+            <div class="dashboard-header">
+                <h1>Welcome, ${user.username}!</h1>
+                <div class="stats">
+                    <div class="stat-card">
+                        <h3>Points</h3>
+                        <p>${user.points || 0}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Completed Projects</h3>
+                        <p>${user.completedProjects || 0}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Role</h3>
+                        <p>${user.role ? user.role.replace('ROLE_', '') : 'User'}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-actions">
+                <a href="/marketplace" class="btn btn-large">Browse Projects</a>
+                <a href="/quests" class="btn-outline btn-large">View Quests</a>
+            </div>
+
+            <div class="recent-activity">
+                <h2>Quick Actions</h2>
+                <div class="action-list">
+                    <div class="action-item">
+                        <h4>🏆 Complete Quests</h4>
+                        <p>Earn points by solving coding challenges</p>
+                        <a href="/quests" class="btn btn-small">View Quests</a>
+                    </div>
+                    <div class="action-item">
+                        <h4>💼 Find Projects</h4>
+                        <p>Browse available projects in the marketplace</p>
+                        <a href="/marketplace" class="btn btn-small">Browse Projects</a>
+                    </div>
+                    <div class="action-item">
+                        <h4>📊 Check Ranking</h4>
+                        <p>See where you stand on the leaderboard</p>
+                        <a href="/leaderboard" class="btn btn-small">View Leaderboard</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('dashboardContent').innerHTML = dashboardHTML;
+    }
+
+    async function logout() {
+        try {
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include'
+            });
+            window.location.href = '/';
+        } catch (error) {
+            console.error('Logout error:', error);
+            window.location.href = '/';
+        }
+    }
+
+    // Add CSS for action items
+    const style = document.createElement('style');
+    style.textContent = `
+        .loading-message {
+            text-align: center;
+            padding: 3rem;
+            color: #ccc;
+        }
+        .action-item {
+            background: #1a1a1a;
+            padding: 1.5rem;
+            border-radius: 10px;
+            border: 1px solid #333;
+            margin-bottom: 1rem;
+        }
+        .action-item h4 {
+            color: #00e6c3;
+            margin-bottom: 0.5rem;
+        }
+        .action-item p {
+            color: #ccc;
+            margin-bottom: 1rem;
+        }
+        .action-list {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Start loading
+    loadDashboard();
+</script>
+</body>
+</html>
