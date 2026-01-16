@@ -1,6 +1,16 @@
 # CodeArena Platform
 
 A web-based platform connecting clients with developers through coding projects and quests.
+#Mini Project
+
+This is a Mini Project that our Team has worked hard to build.
+
+#Team Members
+
+1)MahammedTaha Sayeed Mhaskar
+2)Uves Hasanmian Mukadam
+3)Ashwin Ashok Mohite
+4)Muzaffar Mubarak Kazi
 
 ## Features
 
